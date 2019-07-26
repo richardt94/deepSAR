@@ -10,14 +10,17 @@ from keras.activations import softmax
 
 from noise_layer import speckle_noise
 
+from keras.utils import plot_model
+
 #a simple denoising autoencoder as a Keras Model object. The architecture is influenced by
 #the denoising autoencoder example at https://keras.io/examples/mnist_denoising_autoencoder/
 
 def denoise_autoenc(pretrained_weights = None, input_size = (256,256,1), batch_size = 128,
-    kernel_size = 3, latent_dim = 16, layer_filters = [32,64]):
+    kernel_size = 5, latent_dim = 65536, layer_filters = [32,64]):
     #input layer
     inputs = Input(input_size)
-    #encoder layers (a CNN)
+
+    #encoder layers (a CNN)
     x = inputs
     for filters in layer_filters:
         #padding must be 'same' for the decoder stage to work

@@ -2,61 +2,74 @@ import numpy as np
 from keras.models import *
 from keras.layers import *
 
+from keras import backend as K
 
-#a simple denoising autoencoder as a Keras Model object. The architecture is influenced by
-#the denoising autoencoder example at https://keras.io/examples/mnist_denoising_autoencoder/
+from keras.optimizers import *
 
-def denoise_autoenc(pretrained_weights = None, input_size = (256,256,1),
-                    kernel_size = 5, latent_dim = 192, layer_filters = [32,64]):
+from noise_layer import speckle_noise
+
+#a simple denoising autoencoder as a Keras Model object.
+
+def denoise_autoenc(pretrained_weights = None, input_size = (64,64,1),
+                     latent_dim = 8192):
     #input layer
     inputs = Input(input_size)
-    #encoder layers (a CNN)
-    x = inputs
-    for filters in layer_filters:
-        #padding must be 'same' for the decoder stage to work
-        x = Conv2D(filters = filters,
-           kernel_size = kernel_size,
-           strides = 2,
-           activation = 'relu',
-           padding = 'same')(x)
-    
-    #shape of the bottom encoder layer
-    shape = K.int_shape(x)
 
-    #Dense layer provides the final encoded representation
-    x = Flatten()(x)
-    latent = Dense(latent_dim)(x)
+    shape = K.int_shape(inputs)
 
-    encoder = Model(inputs,latent)
+    x = Flatten()(inputs)
+    latent = Dense(latent_dim, activation = None)(x)
 
     #the decoder model reverses the encoder layers
-    latent_inputs = Input(shape = (latent_dim,))
-    x = Dense(shape[1]*shape[2]*shape[3])(latent_inputs)
-    x = Reshape((shape[1], shape[2], shape[3]))(x)
-    
-    for filters in layer_filters[::-1]:
-        x = Conv2DTranspose(filters = filters,
-                            kernel_size = kernel_size,
-                            strides = 2,
-                            activation = 'relu',
-                            padding = 'same')(x)
+    x = Dense(shape[1]*shape[2]*shape[3],activation = None)(latent)
+    outputs = Reshape((shape[1], shape[2], shape[3]))(x)
 
-    
-    #final deconv layer restores the size of original input
-    x = Conv2DTranspose(filters = 1,
-                        kernel_size = kernel_size,
-                        padding = 'same')(x)
-    
-    outputs = Activation('sigmoid')(x)
 
-    decoder = Model(latent_inputs,outputs)
-
-    autoenc = Model(inputs, decoder(encoder(inputs)))
+    autoenc = Model(inputs, outputs)
 
     #get it ready for training
-    autoenc.compile(loss='mse', optimizer='adam')
+
+    opt = Adam(lr=1e-2)
+
+    autoenc.compile(loss='mean_squared_error', optimizer=opt)
+
+    if(pretrained_weights):
+    	autoenc.load_weights(pretrained_weights)
 
     return autoenc
     
+#train flag tells the speckle_noise layer to actually add the synthetic noise. to be used for training
+#or evaluation on simulated 'SAR images' from optical RGB.
+#output_noisy tells the model to return the input with the speckle noise added (if applicable), in addition
+#to the denoised output. This is useful for evaluation of the model both with the synthetic SAR speckle
+#(if train = True) or real SAR images (if train=False) as it allows easier matching of an 
+
+def conv_denoise_autoenc(pretrained_weights = None, input_size = (64,64,1), train = False, output_noisy=False):
+    input_img = Input(input_size)
+
+    noisy = Lambda(speckle_noise, arguments = {'train': train})(input_img)
+    
+
+    x = Conv2D(16,(3,3), activation='relu', padding='same')(noisy)
+    x = MaxPooling2D((2,2))(x)
+    x = Conv2D(16,(3,3), activation='relu', padding='same')(x)
+    encoded = MaxPooling2D((2,2), name='encoder')(x)
+
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(encoded)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    decoded = Conv2D(1, (3, 3), activation='softsign', padding='same')(x)
+
+    if output_noisy:
+        autoencoder = Model(inputs=input_img, outputs=[decoded,noisy])
+    else:
+        autoencoder = Model(inputs=input_img, outputs=decoded)
+    autoencoder.compile(optimizer='adam', loss='mse')
+
+    if(pretrained_weights):
+    	autoencoder.load_weights(pretrained_weights)
+
+    return autoencoder
 
     
