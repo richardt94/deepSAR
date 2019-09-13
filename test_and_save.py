@@ -20,7 +20,7 @@ val_iter = datagen.flow_from_directory("UCMerced_LandUse/Images/test",
 
 #initialise and test the model
 #we're still using the synthetic speckle so we need to set train=True
-model = conv_denoise_autoenc(pretrained_weights='denoise_autoenc-60-0.21.hdf5', input_size=(256,256,1), train = True, output_noisy=True)
+model = unet_autoenc(pretrained_weights='unet_autoenc-59-0.18.hdf5', input_size=(256,256,1), train = True, output_noisy=True)
 
 results = model.predict_generator(val_iter, steps = len(val_iter))
 

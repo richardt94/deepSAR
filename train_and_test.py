@@ -22,9 +22,9 @@ val_iter = datagen.flow_from_directory("UCMerced_LandUse/Images/test",
 
                                             
 #initialise and fit the model
-model = conv_denoise_autoenc(input_size=(256,256,1), train = True)
+model = unet_autoenc(input_size=(256,256,1), train = True)
 
-filepath="denoise_autoenc-{epoch:02d}-{val_loss:.2f}.hdf5"
+filepath="unet_autoenc-{epoch:02d}-{val_loss:.2f}.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callback_list = [checkpoint]
 

@@ -23,8 +23,7 @@ def denoise_autoenc(pretrained_weights = None, input_size = (64,64,1),
     #the decoder model reverses the encoder layers
     x = Dense(shape[1]*shape[2]*shape[3],activation = None)(latent)
     outputs = Reshape((shape[1], shape[2], shape[3]))(x)
-
-
+    
     autoenc = Model(inputs, outputs)
 
     #get it ready for training
@@ -36,8 +35,7 @@ def denoise_autoenc(pretrained_weights = None, input_size = (64,64,1),
     if(pretrained_weights):
     	autoenc.load_weights(pretrained_weights)
 
-    return autoenc
-    
+    return autoenc  
 #train flag tells the speckle_noise layer to actually add the synthetic noise. to be used for training
 #or evaluation on simulated 'SAR images' from optical RGB.
 #output_noisy tells the model to return the input with the speckle noise added (if applicable), in addition
@@ -72,4 +70,34 @@ def conv_denoise_autoenc(pretrained_weights = None, input_size = (64,64,1), trai
 
     return autoencoder
 
+def unet_autoenc(pretrained_weights = None, input_size = (256,256,1), train = False, output_noisy = False):
+    input_img = Input(input_size)
+
+    noisy = Lambda(speckle_noise, arguments = {'train': train})(input_img)
     
+
+    x = Conv2D(16,(3,3), activation='relu', padding='same')(noisy)
+    cat_1 = x
+    x = MaxPooling2D((2,2))(x)
+    x = Conv2D(16,(3,3), activation='relu', padding='same')(x)
+    cat_2 = x
+    encoded = MaxPooling2D((2,2), name='encoder')(x)
+
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(encoded)
+    x = UpSampling2D((2, 2))(x)
+    x = Concatenate(axis=-1)([cat_2,x])
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    x = Concatenate(axis=-1)([cat_1,x])
+    decoded = Conv2D(1, (3, 3), activation='softsign', padding='same')(x)
+
+    if output_noisy:
+        autoencoder = Model(inputs=input_img, outputs=[decoded,noisy])
+    else:
+        autoencoder = Model(inputs=input_img, outputs=decoded)
+    autoencoder.compile(optimizer='adam', loss='mse')
+
+    if(pretrained_weights):
+        autoencoder.load_weights(pretrained_weights)
+
+    return autoencoder
