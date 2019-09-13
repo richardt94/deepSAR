@@ -6,7 +6,7 @@ from keras import backend as K
 
 from keras.optimizers import *
 
-from noise_layer import speckle_noise
+from .noise_layer import speckle_noise
 
 #a simple denoising autoencoder as a Keras Model object.
 
@@ -23,7 +23,7 @@ def denoise_autoenc(pretrained_weights = None, input_size = (64,64,1),
     #the decoder model reverses the encoder layers
     x = Dense(shape[1]*shape[2]*shape[3],activation = None)(latent)
     outputs = Reshape((shape[1], shape[2], shape[3]))(x)
-    
+
     autoenc = Model(inputs, outputs)
 
     #get it ready for training
